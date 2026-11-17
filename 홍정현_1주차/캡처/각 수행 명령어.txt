@@ -1,0 +1,23 @@
+1번 캡처
+소스 파일에서 터미널 실행 후
+python -m pytest tests -v
+명렁어 입력
+25 passed가 나오면 성공
+
+2번 캡처
+소스 파일에서
+pip install pyshp pyproj
+라이브러리 설치
+python convert_standard_nodelink.py "C:\...\MOCT_NODE.shp" "C:\...\MOCT_LINK.shp"
+라는 명령어 입력
+
+교차로 28,441개, 도로 구간 40,914개가 남았습니다.
+좌표 3개가 위도 35.8x, 경도 128.5x로 대구 안입니다.
+[끊긴 길]이 0개이고, 제한 속도가 없는 도로도 0개입니다.
+지역 번호가 150~157만 남았습니다.
+
+3번 캡처
+소스 파일에서 linkspeed.json이 있는 상태로
+python check_linkspeed.py linkspeed.json
+명령어 입력
+번호 대조 4723개(98.3%), 닿는 교차로 27169개, "오류 없이 끝남"이 나오면 성공

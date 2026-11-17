@@ -1,0 +1,48 @@
+홍정현 파트 제출용: 바꾸거나 더 만든 메소드 (④)
+==============================================
+
+[1주차]
+
+RoadApi
+  - load_node_link()
+      뼈대 그대로. 파일이 없거나 비었거나 숫자가 잘못되면 더미 CSV로 읽고 is_dummy=True
+  - __read_nodes(path), __read_links(path)
+      더 만든 내부 메소드 (CSV를 한 줄씩 읽어 int/float로 변환)
+
+Crossroad
+  - find_crossroad(lat, lon)
+      뼈대 그대로. 300m 비교는 소수 6자리로 반올림해서 비교한다 (300m 딱 맞으면 정상)
+  - __distance(...)
+      뼈대 그대로 (하버사인, 반지름 6371000)
+
+ShortestRoad
+  - passway_time, dijkstra, make_route
+      뼈대 그대로. dijkstra는 경로 거리 계산용으로 내부에 __prev_len도 저장한다
+  - sort_hospitals(hospitals)
+      반환: (hpid, name, beds, eta_min, distance_m, node_count)
+      갈 수 없는 병원은 목록에서 뺀다.
+      node_count는 사고 교차로와 병원 교차로를 포함한 경로의 교차로 수(len(route))이다.
+      dijkstra를 먼저 안 불렀으면 ValueError가 난다.
+
+별도 파일
+  - convert_standard_nodelink.py
+      표준노드링크 SHP -> data/node.csv, data/link.csv
+      대구 거르기: NODE_ID, LINK_ID 앞 3자리가 150~157 (지역 칸 STNL_REG가 있으면 그 값)
+      좌표: EPSG:5186 -> EPSG:4326
+  - check_linkspeed.py
+      linkspeed.json의 번호를 link.csv와 대조하고, 실제 속도로 ShortestRoad를 돌려 본다
+      (도로 속도 테스트 안내 ①②)
+
+[실행 결과]
+  - 단위 테스트 25개 전부 통과
+  - 대구 자르기: 교차로 28,441개, 도로 구간 40,914개, 끊긴 길 0개
+  - 교통 API 번호 대조: 서로 다른 번호 4805개 중 link.csv에 있는 것 4723개 (98.3%)
+
+[2주차 예정: 이번 제출 아님]
+  - Message: 계획서 부록 문구 상수 전부, info, warn, error
+  - StartUi: show(), __clicked()
+  - PastRouteUi: show(), __fill, __search, __delete, __back
+
+[확인해 달라고 남기는 점]
+  - 부록 EX-09 문구는 2.6 표(마침표 있음)와 3.2.4 표(마침표 없음)가 다르다. 2.6 표를 따랐다.
+  - 부록 EX-03과 3.2.1 시작 문구는 마침표가 없는 것이 계획서 그대로다.
