@@ -1,5 +1,6 @@
 from datetime import datetime
 
+# duckdb: 파일 하나(traffic.db)에 표(테이블)를 저장하는 DB. SQL 문장으로 저장·조회한다
 import duckdb
 
 
@@ -13,6 +14,7 @@ class Repository:
  #db_path 뜻: DB파일 이름을 받는 변수, 아무값도 안넣고 부르면 traffic.db를 쓴다.
  # self 뜻 = 객체 자신
     def __init__(self, db_path="traffic.db"):
+        # DB 파일에 연결한다. 파일이 없으면 새로 만든다
         self.__con = duckdb.connect(db_path)
         self.create_tables()
 
@@ -114,11 +116,14 @@ class Repository:
 
         //「프로그램을 켤 때마다 데이터를 저장하되, 이미 DB에 있는 교차로·도로는 다시 넣지 않고, 병원은 병상 수만 바꾼다.」
         중간에 오류가 나면 둘 다 저장하지 않고(ROLLBACK) 오류를 그대로 올린다."""
+        # 이미 도로망이 들어 있으면 다시 넣지 않는다 (교차로 2만 8천 개를 매번 넣으면 느리고 중복 오류가 난다)
         if self.has_road():
             return False
+        # 코드 안에서는 번호가 int, DB 안에서는 글자(Varchar)로 저장하므로 여기서 str()로 바꾼다
         node_rows = [(str(n[0]), n[1], float(n[2]), float(n[3])) for n in nodes]
         link_rows = [(str(l[0]), str(l[1]), str(l[2]), float(l[3]),
                       None if l[4] is None else int(l[4])) for l in links]
+        # begin ~ commit: 여러 저장을 '전부 성공 아니면 전부 취소'로 묶는다 (트랜잭션)
         self.__con.begin()
         try:
             # 외래키 때문에 node를 먼저, link를 나중에 넣는다
@@ -126,6 +131,7 @@ class Repository:
             self.__insert_many("link", ["link_id", "f_node_id", "t_node_id", "length_m", "max_spd"], link_rows)
             self.__con.commit()
         except Exception:
+            # 중간에 오류가 나면 이미 넣은 것까지 되돌린다
             self.__con.rollback()
             raise
         return True
@@ -154,6 +160,7 @@ class Repository:
         collected_at = 속도를 잰 시간 (datetime)
         link 테이블에 있는 번호만 저장한다 (없는 번호는 외래키 오류가 나므로 뺀다).
         반환: 저장한 개수"""
+        # link 표에 있는 도로 번호만 저장한다. 없는 번호를 넣으면 외래키(REFERENCES) 오류가 난다 (속도 API에는 우리 link.csv에 없는 번호 82개가 있다)
         known = {r[0] for r in self.__con.execute("SELECT link_id FROM link").fetchall()}
         rows = [(str(link_id), collected_at, float(speed))
                 for link_id, speed in speeds if str(link_id) in known]
@@ -183,8 +190,10 @@ class Repository:
         try:
             for hpid, name, lat, lon, node_id, addr, tel, beds in rows:
                 node = None if node_id is None else str(node_id)
+                # 이미 있는 병원인지 먼저 센다
                 exists = self.__con.execute(
                     "SELECT COUNT(*) FROM hospital WHERE hpid = ?", [hpid]).fetchone()[0]
+                # 있으면 병상 수만 갱신(UPDATE), 없으면 새로 추가(INSERT). 병원 정보는 거의 안 바뀌고 병상 수만 계속 바뀌기 때문이다
                 if exists:
                     self.__con.execute("UPDATE hospital SET beds = ? WHERE hpid = ?", [beds, hpid])
                 else:
@@ -235,6 +244,7 @@ class Repository:
         saved_at = saved_at or datetime.now()
         self.__con.begin()
         try:
+            # RETURNING: 방금 넣은 줄의 자동 번호(accident_id)를 바로 돌려받는다. 다음 표에 연결할 때 쓴다
             accident_id = self.__con.execute(
                 """INSERT INTO accident_point (lat, lon, created_at, node_id)
                    VALUES (?, ?, ?, ?) RETURNING accident_id""",
@@ -245,6 +255,7 @@ class Repository:
                    VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?) RETURNING route_id""",
                 [saved_at, eta_minutes, distance_m, node_count,
                  is_recommended, accident_id, hpid, beds]).fetchone()[0]
+            # 경로의 교차로를 순서(seq 1, 2, 3 ...)와 함께 한 줄씩 저장한다. 순서를 저장해야 나중에 경로를 그대로 다시 그릴 수 있다
             for seq, node_id in enumerate(route_nodes, start=1):
                 self.__con.execute("INSERT INTO route_node VALUES (?, ?, ?)",
                                    [route_id, seq, str(node_id)])
@@ -259,6 +270,7 @@ class Repository:
         route_id = 식별 번호(int) / hospital_name = 병원 명 / date = "2026-11-09" 형식 글자
         반환: [(route_id, calculated_at, hospital_name, beds, eta_minutes, distance_m, node_count), ...]
         입력이 맞는 형식인지는 확인하지 않는다 (PastRouteManager가 한다)."""
+        # 세 표(route_result, accident_point, hospital)를 JOIN으로 이어 병원 이름까지 한 번에 가져온다. WHERE 1 = 1은 아래에서 AND 조건을 편하게 이어 붙이려는 관용구다
         sql = """SELECT r.route_id, r.calculated_at, h.name, r.beds,
                         r.eta_minutes, r.distance_m, r.node_count
                  FROM route_result r
@@ -266,6 +278,7 @@ class Repository:
                  JOIN hospital h ON r.hospital_hpid = h.hpid
                  WHERE 1 = 1"""
         params = []
+        # 값이 들어온 조건만 WHERE에 붙인다. ?는 값이 들어갈 자리이고, 이렇게 하면 SQL 주입을 막는다
         if route_id is not None:
             sql += " AND r.route_id = ?"
             params.append(route_id)
@@ -275,6 +288,7 @@ class Repository:
         if date is not None:
             sql += " AND CAST(r.calculated_at AS DATE) = CAST(? AS DATE)"
             params.append(date)
+        # 식별 번호 순서로 정렬한다
         sql += " ORDER BY r.route_id"
         return self.__con.execute(sql, params).fetchall()
 
@@ -289,6 +303,7 @@ class Repository:
         accident_id = row[0]
         try:
             # 한 단계씩 확정하면서 지운다 (앞 단계가 끝나야 다음 테이블의 참조가 사라진다)
+            # 다른 표가 참조하는 쪽(route_node)부터 지워야 외래키 오류가 나지 않는다
             self.__con.execute("DELETE FROM route_node WHERE route_id = ?", [route_id])
             self.__con.execute("DELETE FROM route_result WHERE route_id = ?", [route_id])
             self.__con.execute("DELETE FROM accident_point WHERE accident_id = ?", [accident_id])
@@ -307,12 +322,14 @@ class Repository:
             return
         cols = ", ".join(columns)
         try:
+            # pandas가 있으면 표 형태로 한 번에 넣어 훨씬 빠르다 (교차로 2만 8천 개). 없으면 아래처럼 한 줄씩 넣는다
             import pandas as pd
         except ImportError:
             marks = ", ".join(["?"] * len(columns))
             self.__con.executemany(f"INSERT INTO {table} ({cols}) VALUES ({marks})", rows)
             return
         frame = pd.DataFrame(rows, columns=columns)
+        # pandas 표를 DB가 임시 표(tmp_rows)로 볼 수 있게 등록한다
         self.__con.register("tmp_rows", frame)
         try:
             self.__con.execute(f"INSERT INTO {table} ({cols}) SELECT {cols} FROM tmp_rows")
