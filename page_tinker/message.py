@@ -76,15 +76,12 @@ class Message:
         first = 첫 문장, second = 둘째 문장 (None이면 한 줄),
         on_close = 「닫기」를 누른 뒤 부를 함수 (main.py의 다음 안내, root.destroy 등)"""
         root = Message.root
-        # 1) 제목 줄과 창 테두리가 없는 창을 root 위에 붙인다
-        alert = tk.Toplevel(root)
-        alert.overrideredirect(True)
-        alert.transient(root)
-        # 2) 테두리 1px: 창 바탕을 border 색으로 하고, 흰 Frame을 1px 안쪽으로 채운다
-        alert.configure(bg=COLOR["border"])
+        # 1) 새 창(Toplevel)을 만들지 않고, root 창 안에 테두리 1px짜리 Frame을 올린다
+        #    (제목 줄 없는 별도 창은 Windows에서 창 전체가 먹통이 되는 일이 있어서 쓰지 않는다)
+        alert = tk.Frame(root, bg=COLOR["border"])
         body = tk.Frame(alert, bg=COLOR["white"])
         body.pack(fill="both", expand=True, padx=1, pady=1)
-        # 3) 첫 문장 → (둘째 문장) → 구분선 → 닫기를 위에서부터 붙인다
+        # 2) 첫 문장 → (둘째 문장) → 구분선 → 닫기를 위에서부터 붙인다
         tk.Label(body, text=first, font=FONT["l_bold"], fg="black", bg=COLOR["white"],
                  wraplength=360, justify="center").pack(fill="x", pady=(24, 0), padx=20)
         if second:
@@ -108,13 +105,12 @@ class Message:
 
         close.bind("<ButtonPress-1>", press)
         close.bind("<ButtonRelease-1>", release)
-        # 4) 높이를 잰 뒤 창(960x650) 가운데에 놓고, 닫기 전에는 뒤 화면 클릭을 막는다
-        alert.update_idletasks()
-        height = alert.winfo_reqheight()
-        x = root.winfo_rootx() + (960 - 400) // 2
-        y = root.winfo_rooty() + (650 - height) // 2
-        alert.geometry(f"400x{height}+{x}+{y}")
-        alert.grab_set()
+        # 3) 폭 400, 높이는 내용만큼, root 창 한가운데에 놓고 맨 위로 올린다
+        alert.place(relx=0.5, rely=0.5, anchor="center", width=400)
+        alert.lift()
+        # 4) 닫기 전에는 뒤 화면을 누를 수 없게: 경고창 Frame이 클릭을 모두 가져간다 (닫으면 저절로 풀림)
+        #    새 창이 아니라 Frame에 거는 것이라 Windows 먹통 문제와 상관없다
+        Message.hold_clicks(alert)
 
     @staticmethod
     def show_toast(text, widget, gray=False):
@@ -165,6 +161,17 @@ class Message:
                 Message.toast = None
 
         root.after(2000, remove)
+
+    @staticmethod
+    def hold_clicks(frame):
+        """frame이 화면에 보인 뒤 grab_set()으로 앱의 클릭을 frame 안으로만 받는다 (경고창 · 확인창 공통).
+        frame을 destroy()하면 grab이 저절로 풀린다"""
+        def grab():
+            try:
+                frame.grab_set()
+            except tk.TclError:
+                pass       # 아직 안 보이거나 이미 닫힌 경우
+        frame.after(10, grab)
 
     @staticmethod
     def __round_rect(canvas, x1, y1, x2, y2, r, fill, outline):

@@ -1,21 +1,28 @@
 """ShortestRoad - 통행 시간 계산 + 다익스트라 + 병원 비교 (AD-02, AD-05, AD-07, FR-01)."""
 # heapq: 가장 작은 값을 빨리 꺼내는 '최소 힙'. 다익스트라에서 지금까지 가장 빠른 교차로를 꺼낼 때 쓴다
+     #🌠heapq는 최소 힙 자료구조: 부모의 값<=자식의 값
+     #🌠heapq는 시간복잡도 log(N)
+
+
 import heapq
 
 
 class ShortestRoad:
-    # 이 범위(1~150km/h) 밖의 속도는 비정상 값으로 보고 그 도로를 계산에서 뺀다 (계획서 2.5.1)
+#⭐속도 제한: 1~150km/ 비정상적인 속도 데이터를 걸러내기 위해서
     MIN_SPEED = 1
     MAX_SPEED = 150
 
     def __init__(self, links, speeds):
-        """links  = [(link_id, f_node_id, t_node_id, length_m, max_spd), ...]
-        speeds = [(link_id, speed_kmh), ...]   (둘 다 오은찬이 DB에서 꺼내 넘김)"""
-        # graph(인접 리스트): 교차로마다 '갈 수 있는 다음 교차로, 걸리는 시간(초), 길이(m)'를 모아 둔 사전
-        self.__graph = {}      # {교차로: [(다음 교차로, 통행 시간(초), 길이(m)), ...]}
-        self.__dist = {}       # {교차로: 사고 교차로에서 최소 시간(초)}
-        self.__prev = {}       # {교차로: 최소 시간 경로에서 바로 앞 교차로}
-        self.__prev_len = {}   # {교차로: 바로 앞 교차로에서 오는 도로 길이(m)}
+     
+#🪐 인접리스트 알고리즘(방향그래프: 일방 통행) self.graph      
+#⭐ self._graph: 교차로마다 '갈 수 있는 다음 교차로, 걸리는 시간(초), 길이(m)'를 모아 둔 딕셔너리
+        self.__graph = {} #_graph: {"A" : [("B", 10, 100), ("C", 20, 200)], "B": [("C", 5, 50)], "C": []}
+#⭐ self._dist:사고 지점부터 대구 모든 갈 수 있는 교차로의 누적 시간을 저장하는 딕셔너리     
+        self.__dist = {} #_dist: {"A":0, "B": 10, "C": 20} 자기 자신도 저장
+#⭐ self._prev:바로 이전 교차로를 저장하는 딕셔너리
+        self.__prev = {} #_prev: {"A":none, "B": "A", "C": "B"}  A->B->C
+#⭐ 이전 구간의 길이 저장하는 딕셔너리 
+        self.__prev_len = {} #_prev_len: {"A":0, "B": 100, "C": 50}  A->B 길이 100m, B->C 길이 50m
         self.__start = None
 
         # 속도 목록을 {도로 번호: 속도} 사전으로 바꾸면 도로마다 바로 찾을 수 있다
@@ -92,7 +99,7 @@ class ShortestRoad:
         # 병상이 있으면 0, 없거나 모르면(None) 1. 이 값으로 정렬하면 병상 있는 병원이 앞에 온다
         no_bed = lambda r: 0 if (r[2] is not None and r[2] > 0) else 1
         # 1순위는 병상 유무, 2순위는 도착 시간(분) 오름차순
-        rows.sort(key=lambda r: (no_bed(r), r[3]))
+        rows.sort(key=lambda r: (no_bed(r), r[3], r[4]))
         return rows
 
     def make_route(self, hospital_node):

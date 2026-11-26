@@ -106,3 +106,18 @@ def test_dummy_data_end_to_end_no_error():
     rows = sr.sort_hospitals([("h4", "대구역병원", 4, 2), ("h5", "경북대병원", 5, 0), ("h2", "반월당병원", 2, 1)])
     assert [r[0] for r in rows] == ["h2", "h4", "h5"]   # 병상 있는 병원 중 빠른 h2(약 32초)가 먼저, 병상 0인 h5는 맨 뒤
     assert all(r[3] >= 0 and r[4] > 0 and r[5] >= 2 for r in rows)
+
+
+def test_3_5_same_time_shorter_distance_first():
+    """도착 시간이 같으면 거리가 짧은 병원이 먼저 (2주차 정렬 한 줄)
+    병원1: 600m 36km/h = 60초 / 병원2: 300m 18km/h = 60초 (시간은 같고 거리는 병원2가 짧다)"""
+    links = [(1, S, H1, 600, 36), (2, S, H2, 300, 18)]
+    sr = ShortestRoad(links, [])
+    sr.dijkstra(S)
+    rows = sr.sort_hospitals([("h1", "병원1", H1, 3), ("h2", "병원2", H2, 3)])
+    assert [r[0] for r in rows] == ["h2", "h1"]
+    assert rows[0][3] == pytest.approx(1.0) and rows[1][3] == pytest.approx(1.0)
+    assert [r[4] for r in rows] == [300.0, 600.0]
+    # 입력 순서를 바꿔도 같은 결과
+    rows = sr.sort_hospitals([("h2", "병원2", H2, 3), ("h1", "병원1", H1, 3)])
+    assert [r[0] for r in rows] == ["h2", "h1"]

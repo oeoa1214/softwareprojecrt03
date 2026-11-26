@@ -20,13 +20,13 @@ names = [n for n in vars(Message) if n.isupper()]
 print("문구 상수", len(names), "개")
 frame = tk.Frame(root)
 frame.pack(fill="both", expand=True, padx=10, pady=10)
+btn_holder = {}   # {상수 이름: 버튼}. for문 밖에서 한 번만 만든다 (안에서 만들면 마지막 사전만 남는다)
 for i, name in enumerate(names):
     value = getattr(Message, name)
     if isinstance(value, tuple):
         # 경고창 문구 (첫 문장, 둘째 문장 또는 None)
         command = lambda v=value, n=name: Message.show_alert(*v, on_close=lambda: print(n, "닫기 눌림"))
     else:
-        btn_holder = {}
         command = lambda v=value, n=name: Message.show_toast(v if len(v) < 40 else v[:38] + "…", btn_holder[n])
     btn = tk.Button(frame, text=name, width=20, command=command)
     if not isinstance(value, tuple):
